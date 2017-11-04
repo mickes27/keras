@@ -133,19 +133,28 @@ def set_learning_phase(value):
     _GRAPH_LEARNING_PHASES[tf.get_default_graph()] = value
 
 
+def _initialize_variables():
+    """Utility to initialize uninitialized variables on the fly.
+    """
+    variables = tf.global_variables()
+    uninitialized_variables = []
+    for v in variables:
+        if not hasattr(v, '_keras_initialized') or not v._keras_initialized:
+            uninitialized_variables.append(v)
+            v._keras_initialized = True
+    if uninitialized_variables:
+        sess = get_session()
+        sess.run(tf.variables_initializer(uninitialized_variables))
+
+
 def get_session():
     """Returns the TF session to be used by the backend.
-
     If a default TensorFlow session is available, we will return it.
-
     Else, we will return the global Keras session.
-
     If no global Keras session exists at this point:
     we will create a new global session.
-
     Note that you can manually set the global session
     via `K.set_session(sess)`.
-
     # Returns
         A TensorFlow session.
     """
@@ -164,23 +173,7 @@ def get_session():
         session = _SESSION
     if not _MANUAL_VAR_INIT:
         with session.graph.as_default():
-            variables = tf.global_variables()
-            candidate_vars = []
-            for v in variables:
-                if not getattr(v, '_keras_initialized', False):
-                    candidate_vars.append(v)
-            if candidate_vars:
-                # This step is expensive, so we only run it on variables
-                # not already marked as initialized.
-                is_initialized = session.run(
-                    [tf.is_variable_initialized(v) for v in candidate_vars])
-                uninitialized_vars = []
-                for flag, v in zip(is_initialized, candidate_vars):
-                    if not flag:
-                        uninitialized_vars.append(v)
-                    v._keras_initialized = True
-                if uninitialized_vars:
-                    session.run(tf.variables_initializer(uninitialized_vars))
+            _initialize_variables()
     return session
 
 
