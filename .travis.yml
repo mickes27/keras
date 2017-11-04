@@ -22,7 +22,6 @@ matrix:
 #        - python: 3.6
 #          env: KERAS_BACKEND=cntk PYTHONWARNINGS=ignore
 install:
-  - travis_wait 60 mvn install
   # code below is taken from http://conda.pydata.org/docs/travis.html
   # We do this conditionally because it saves us some downloading if the
   # version is the same.
@@ -95,5 +94,5 @@ script:
     elif [[ "$TEST_MODE" == "DOC" ]]; then
         PYTHONPATH=$PWD:$PYTHONPATH py.test tests/test_documentation.py;
     else
-       PYTHONPATH=$PWD:$PYTHONPATH py.test tests/ --ignore=tests/integration_tests --ignore=tests/test_documentation.py --cov=keras tests/ --cov-fail-under 79 --cov-report term-missing -v -n 1;
+       travis_wait 60 PYTHONPATH=$PWD:$PYTHONPATH py.test tests/ --ignore=tests/integration_tests --ignore=tests/test_documentation.py --cov=keras tests/ --cov-fail-under 79 --cov-report term-missing -v -n 1;
     fi
