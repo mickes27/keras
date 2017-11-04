@@ -94,5 +94,5 @@ script:
     elif [[ "$TEST_MODE" == "DOC" ]]; then
         PYTHONPATH=$PWD:$PYTHONPATH py.test tests/test_documentation.py;
     else
-        travis_wait 30 PYTHONPATH=$PWD:$PYTHONPATH py.test tests/ --ignore=tests/integration_tests --ignore=tests/test_documentation.py --cov=keras tests/ --cov-fail-under 79 --cov-report term-missing -v -n 1;
+        PYTHONPATH=$PWD:$PYTHONPATH travis_wait 60 py.test tests/ --ignore=tests/integration_tests --ignore=tests/test_documentation.py --cov=keras tests/ --cov-fail-under 79 --cov-report term-missing -v -n 1;
     fi
