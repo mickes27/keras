@@ -96,11 +96,11 @@ class Merge(Layer):
         self.uses_learning_phase = False
         self.input_spec = None  # Compatible with anything.
         self.stateful = False
-        self.trainable = True
         if not name:
             prefix = self.__class__.__name__.lower()
             name = prefix + '_' + str(K.get_uid(prefix))
         self.name = name
+        self._trainable = K.variable(True, name=name + '_trainable')
 
         if layers:
             # This exists for backwards compatibility.
