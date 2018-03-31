@@ -171,9 +171,13 @@ class BatchNormalization(Layer):
                     self.gamma,
                     epsilon=self.epsilon)
 
-        # If the learning phase is *static* and set to inference:
         if training in {0, False}:
+            # If the learning phase is *static* and set to inference:
             return normalize_inference()
+        elif training is None:
+            # If it's undefined then if trainable tensor is on respect learning phase else set to false
+            training = K.switch(self._trainable, K.learning_phase(), K.constant(False, dtype='bool'))
+            training._uses_learning_phase = True
 
         # If the learning is either dynamic, or set to training:
         normed_training, mean, variance = K.normalize_batch_in_training(

@@ -69,7 +69,7 @@ def in_train_phase(x, alt, training=None):
         training = learning_phase()
         uses_learning_phase = True
     else:
-        uses_learning_phase = False
+        uses_learning_phase = getattr(training, '_uses_learning_phase', False)
 
     # CNTK currently don't support cond op, so here we use
     # element_select approach as workaround. It may have
@@ -88,15 +88,23 @@ def in_train_phase(x, alt, training=None):
         return result
 
 
-def in_test_phase(x, alt):
-    global _LEARNING_PHASE
-    # Similar as in_train_phase, use element_select as workaround.
-    if callable(x) and isinstance(x, C.cntk_py.Function) is False:
-        x = x()
-    if callable(alt) and isinstance(alt, C.cntk_py.Function) is False:
-        alt = alt()
+def in_test_phase(x, alt, training=None):
+    """Selects `x` in test phase, and `alt` otherwise.
+    Note that `alt` should have the *same shape* as `x`.
 
-    return C.element_select(learning_phase(), x, alt)
+    # Arguments
+        x: What to return in test phase
+            (tensor or callable that returns a tensor).
+        alt: What to return otherwise
+            (tensor or callable that returns a tensor).
+        training: Optional scalar tensor
+            (or Python boolean, or Python integer)
+            specifying the learning phase.
+
+    # Returns
+        Either `x` or `alt` based on `K.learning_phase`.
+    """
+    return in_train_phase(alt, x, training=training)
 
 
 def _convert_string_dtype(dtype):

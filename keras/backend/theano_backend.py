@@ -1484,7 +1484,7 @@ def in_train_phase(x, alt, training=None):
         training = learning_phase()
         uses_learning_phase = True
     else:
-        uses_learning_phase = False
+        uses_learning_phase = getattr(training, '_uses_learning_phase', False)
 
     if training is 1 or training is True:
         if callable(x):
@@ -1513,6 +1513,15 @@ def in_train_phase(x, alt, training=None):
 def in_test_phase(x, alt, training=None):
     """Selects `x` in test phase, and `alt` otherwise.
     Note that `alt` should have the *same shape* as `x`.
+
+    # Arguments
+        x: What to return in test phase
+            (tensor or callable that returns a tensor).
+        alt: What to return otherwise
+            (tensor or callable that returns a tensor).
+        training: Optional scalar tensor
+            (or Python boolean, or Python integer)
+            specifying the learning phase.
 
     # Returns
         Either `x` or `alt` based on `K.learning_phase`.

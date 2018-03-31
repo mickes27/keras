@@ -297,7 +297,7 @@ class Layer(object):
             name = _to_snake_case(prefix) + '_' + str(K.get_uid(prefix))
         self.name = name
 
-        self.trainable = kwargs.get('trainable', True)
+        self._trainable = K.variable(kwargs.get('trainable', True), name=name+'_trainable')
         if 'input_shape' in kwargs or 'batch_input_shape' in kwargs:
             # In this case we will later create an input layer
             # to insert before the current layer
@@ -323,6 +323,16 @@ class Layer(object):
             self._initial_weights = kwargs['weights']
         else:
             self._initial_weights = None
+
+    @property
+    def trainable(self):
+        return K.get_value(self._trainable)
+
+    @trainable.setter
+    def trainable(self, trainable):
+        if trainable not in {False, True}:
+            raise ValueError('Expected trainable to be False or True.')
+        K.set_value(self._trainable, trainable)
 
     @staticmethod
     def _node_key(layer, node_index):
