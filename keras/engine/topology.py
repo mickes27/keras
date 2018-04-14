@@ -297,8 +297,7 @@ class Layer(object):
             name = _to_snake_case(prefix) + '_' + str(K.get_uid(prefix))
         self.name = name
 
-        trainable = 1 if kwargs.get('trainable', True) else 0
-        self._trainable = K.variable(trainable, dtype='int64', name='trainable')
+        self.trainable = kwargs.get('trainable', True)
         if 'input_shape' in kwargs or 'batch_input_shape' in kwargs:
             # In this case we will later create an input layer
             # to insert before the current layer
@@ -325,12 +324,19 @@ class Layer(object):
         else:
             self._initial_weights = None
 
+    def _init_trainable(self):
+        # Initialized here because many descendants of Layer don't call its constructor
+        if not hasattr(self, '_trainable'):
+            self._trainable = K.variable(1, dtype='int64', name='trainable')
+
     @property
     def trainable(self):
+        self._init_trainable()
         return True if K.get_value(self._trainable) else False
 
     @trainable.setter
     def trainable(self, trainable):
+        self._init_trainable()
         K.set_value(self._trainable, 1 if trainable else 0)
 
     @staticmethod
@@ -1328,7 +1334,7 @@ class InputLayer(Layer):
             name = prefix + '_' + str(K.get_uid(prefix))
         super(InputLayer, self).__init__(dtype=dtype, name=name)
 
-        self._trainable = K.variable(0, dtype='int64', name='trainable')
+        self.trainable = False
         self.built = True
         self.sparse = sparse
 
@@ -1521,7 +1527,6 @@ class Container(Layer):
         self.name = name
 
         self.supports_masking = False
-        self._trainable = K.variable(1, dtype='int64', name='trainable')
         self._per_input_losses = {}
         self._per_input_updates = {}
 

@@ -176,7 +176,7 @@ class BatchNormalization(Layer):
             return normalize_inference()
         elif training is None:
             # If it's undefined then if trainable tensor is on respect learning phase else set to false
-            training = K.switch(self._trainable, K.learning_phase(), K.constant(False, dtype='bool'))
+            training = K.switch(self._trainable, K.learning_phase(), K.constant(0, dtype='int64'))
             training._uses_learning_phase = True
 
         # If the learning is either dynamic, or set to training:

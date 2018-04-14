@@ -391,7 +391,7 @@ class Sequential(Model):
         self.model = None  # Internal Model instance.
         self.inputs = []  # List of input tensors
         self.outputs = []  # List of length 1: the output tensor (unique).
-        self._trainable = True
+        self.trainable = True
         self._initial_weights = None
 
         # Model attributes.
@@ -619,15 +619,11 @@ class Sequential(Model):
             all_attrs += getattr(layer, attr, [])
         return all_attrs
 
-    @property
-    def trainable(self):
-        return self._trainable
-
     @trainable.setter
     def trainable(self, value):
         if self.built:
             self.model.trainable = value
-        self._trainable = value
+        super(Sequential, self).trainable = value
 
     @property
     def trainable_weights(self):
