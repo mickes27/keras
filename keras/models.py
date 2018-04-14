@@ -421,7 +421,6 @@ class Sequential(Model):
         self.model = None  # Internal Model instance.
         self.inputs = []  # List of input tensors
         self.outputs = []  # List of length 1: the output tensor (unique).
-        self.trainable = True
         self._initial_weights = None
 
         # Model attributes.
