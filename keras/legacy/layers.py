@@ -100,7 +100,7 @@ class Merge(Layer):
             prefix = self.__class__.__name__.lower()
             name = prefix + '_' + str(K.get_uid(prefix))
         self.name = name
-        self._trainable = K.variable(True, dtype='bool', name='_trainable')
+        self._trainable = K.variable(True, dtype='bool', name='trainable')
 
         if layers:
             # This exists for backwards compatibility.

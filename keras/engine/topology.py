@@ -298,7 +298,7 @@ class Layer(object):
         self.name = name
 
         self._trainable = K.variable(kwargs.get('trainable', True), dtype='bool',
-                                     name='_trainable')
+                                     name='trainable')
         if 'input_shape' in kwargs or 'batch_input_shape' in kwargs:
             # In this case we will later create an input layer
             # to insert before the current layer
@@ -1331,7 +1331,7 @@ class InputLayer(Layer):
         super(InputLayer, self).__init__(dtype=dtype, name=name)
 
         self._trainable = K.variable(False, dtype='bool',
-                                     name='_trainable')
+                                     name='trainable')
         self.built = True
         self.sparse = sparse
 
@@ -1525,7 +1525,7 @@ class Container(Layer):
 
         self.supports_masking = False
         self._trainable = K.variable(True, dtype='bool',
-                                     name='_trainable')
+                                     name='trainable')
         self._per_input_losses = {}
         self._per_input_updates = {}
 
