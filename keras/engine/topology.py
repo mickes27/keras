@@ -332,7 +332,7 @@ class Layer(object):
     @property
     def trainable(self):
         self._init_trainable()
-        return True if K.get_value(self._trainable) else False
+        return bool(K.get_value(self._trainable))
 
     @trainable.setter
     def trainable(self, trainable):
@@ -1260,7 +1260,7 @@ class Layer(object):
             Python dictionary.
         """
         config = {'name': self.name,
-                  'trainable': bool(self.trainable)}
+                  'trainable': self.trainable}
         if hasattr(self, 'batch_input_shape'):
             config['batch_input_shape'] = self.batch_input_shape
         if hasattr(self, 'dtype'):
