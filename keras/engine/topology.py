@@ -324,20 +324,22 @@ class Layer(object):
         else:
             self._initial_weights = None
 
-    def _init_trainable(self):
-        # Initialized here because many descendants of Layer don't call its constructor
+    def _lazy_init_trainable(self):
+        # Lazy initialization because many descendants of Layer don't call its constructor
         if not hasattr(self, '_trainable'):
-            self._trainable = K.variable(1, dtype='int64', name='trainable')
+            self._trainable = True # Cached value used to avoid unnecessary get_value calls
+            self._trainable_tensor = K.variable(1, dtype='int64', name='trainable')
 
     @property
     def trainable(self):
-        self._init_trainable()
-        return bool(K.get_value(self._trainable))
+        self._lazy_init_trainable()
+        return self._trainable
 
     @trainable.setter
     def trainable(self, trainable):
-        self._init_trainable()
-        K.set_value(self._trainable, 1 if trainable else 0)
+        self._lazy_init_trainable()
+        self._trainable = bool(trainable)
+        K.set_value(self._trainable_tensor, 1 if trainable else 0)
 
     @staticmethod
     def _node_key(layer, node_index):
