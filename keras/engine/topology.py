@@ -329,7 +329,7 @@ class Layer(object):
         if not hasattr(self, '_trainable'):
             # Use cached value used to avoid unnecessary get_value() calls
             self._trainable = True
-            self._trainable_tensor = K.variable(1, dtype='int64', name='trainable')
+            self._trainable_tensor = K.variable(1, dtype='float32', name='trainable')
 
     @property
     def trainable(self):
