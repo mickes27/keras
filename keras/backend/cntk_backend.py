@@ -89,21 +89,6 @@ def in_train_phase(x, alt, training=None):
 
 
 def in_test_phase(x, alt, training=None):
-    """Selects `x` in test phase, and `alt` otherwise.
-    Note that `alt` should have the *same shape* as `x`.
-
-    # Arguments
-        x: What to return in test phase
-            (tensor or callable that returns a tensor).
-        alt: What to return otherwise
-            (tensor or callable that returns a tensor).
-        training: Optional scalar tensor
-            (or Python boolean, or Python integer)
-            specifying the learning phase.
-
-    # Returns
-        Either `x` or `alt` based on `K.learning_phase`.
-    """
     return in_train_phase(alt, x, training=training)
 
 
@@ -164,9 +149,14 @@ def variable(value, dtype=None, name=None, constraint=None):
     shape = value.shape if hasattr(value, 'shape') else ()
     if hasattr(value, 'dtype') and value.dtype != dtype and len(shape) > 0:
         value = value.astype(dtype)
-    # cntk will init type based on the value type
+
+    # TODO: remove the conversion when cntk supports int32, int64
+    # https://docs.microsoft.com/en-us/python/api/cntk.variables.parameter
+    dtype = 'float32' if 'int' in str(dtype) else dtype
+
     v = C.parameter(shape=shape,
                     init=value,
+                    dtype=dtype,
                     name=_prepare_name(name, 'variable'))
     v._keras_shape = v.shape
     v._uses_learning_phase = False
@@ -542,7 +532,11 @@ def batch_dot(x, y, axes=None):
         axes = [len(x_shape) - 1, len(y_shape) - 2]
 
     if len(x_shape) == 2 and len(y_shape) == 2:
-        return sum(x * y, axis=1, keepdims=True)
+        if axes[0] == axes[1]:
+            result = sum(x * y, axis=axes[0], keepdims=True)
+            return result if axes[0] == 1 else transpose(result)
+        else:
+            return sum(x * transpose(y), axis=axes[0], keepdims=True)
     else:
         if len(y_shape) == 2:
             y = expand_dims(y)
@@ -1116,7 +1110,10 @@ def reshape(x, shape):
 def permute_dimensions(x, pattern):
     dims = len(int_shape(x))
     num_dynamic_axis = _get_dynamic_axis_num(x)
-    current_layout = tuple([i for i in range(dims)])
+    if isinstance(pattern, list):
+        current_layout = [i for i in range(dims)]
+    else:
+        current_layout = tuple([i for i in range(dims)])
 
     if num_dynamic_axis > 0 and pattern[:num_dynamic_axis] != current_layout[:num_dynamic_axis]:
         raise ValueError('CNTK backend: the permute pattern %s '

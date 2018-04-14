@@ -1132,6 +1132,9 @@ def batch_dot(x, y, axes=None):
         axes = (axes, axes)
     x_ndim = ndim(x)
     y_ndim = ndim(y)
+    if axes is None:
+        # behaves like tf.batch_matmul as default
+        axes = [x_ndim - 1, y_ndim - 2]
     if x_ndim > y_ndim:
         diff = x_ndim - y_ndim
         y = tf.reshape(y, tf.concat([tf.shape(y), [1] * (diff)], axis=0))
@@ -2504,7 +2507,7 @@ def function(inputs, outputs, updates=None, **kwargs):
 
 
 def gradients(loss, variables):
-    """Returns the gradients of `variables` w.r.t. `loss`.
+    """Returns the gradients of `loss` w.r.t. `variables`.
 
     # Arguments
         loss: Scalar tensor to minimize.
@@ -3942,8 +3945,8 @@ def ctc_batch_cost(y_true, y_pred, input_length, label_length):
         Tensor with shape (samples,1) containing the
             CTC loss of each element.
     """
-    label_length = tf.to_int32(tf.squeeze(label_length))
-    input_length = tf.to_int32(tf.squeeze(input_length))
+    label_length = tf.to_int32(tf.squeeze(label_length, axis=-1))
+    input_length = tf.to_int32(tf.squeeze(input_length, axis=-1))
     sparse_labels = tf.to_int32(ctc_label_dense_to_sparse(y_true, label_length))
 
     y_pred = tf.log(tf.transpose(y_pred, perm=[1, 0, 2]) + epsilon())
