@@ -1256,7 +1256,7 @@ class Layer(object):
             Python dictionary.
         """
         config = {'name': self.name,
-                  'trainable': self.trainable}
+                  'trainable': bool(self.trainable)}
         if hasattr(self, 'batch_input_shape'):
             config['batch_input_shape'] = self.batch_input_shape
         if hasattr(self, 'dtype'):
