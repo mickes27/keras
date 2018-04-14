@@ -42,9 +42,13 @@ class Wrapper(Layer):
         else:
             return None
 
+    @property
+    def trainable(self):
+        return super(Wrapper, self).trainable
+
     @trainable.setter
     def trainable(self, value):
-        Super(Wrapper, self).trainable = value
+        super(Wrapper, self).trainable = value
         self.layer.trainable = value
 
     @property
@@ -272,6 +276,10 @@ class Bidirectional(Wrapper):
         self.supports_masking = True
         super(Bidirectional, self).__init__(layer, **kwargs)
         self.input_spec = layer.input_spec
+
+    @property
+    def trainable(self):
+        return super(Bidirectional, self).trainable
 
     @trainable.setter
     def trainable(self, value):

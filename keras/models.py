@@ -649,6 +649,10 @@ class Sequential(Model):
             all_attrs += getattr(layer, attr, [])
         return all_attrs
 
+    @property
+    def trainable(self):
+        return super(Sequential, self).trainable
+
     @trainable.setter
     def trainable(self, value):
         if self.built:
