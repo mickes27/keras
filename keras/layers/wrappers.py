@@ -48,7 +48,7 @@ class Wrapper(Layer):
 
     @trainable.setter
     def trainable(self, value):
-        super(Wrapper, self).trainable = value
+        super(Wrapper, self.__class__).trainable.fset(self, value)
         self.layer.trainable = value
 
     @property
@@ -283,7 +283,7 @@ class Bidirectional(Wrapper):
 
     @trainable.setter
     def trainable(self, value):
-        super(Bidirectional, self).trainable = value
+        super(Bidirectional, self.__class__).trainable.fset(self, value)
         self.forward_layer.trainable = value
         self.backward_layer.trainable = value
 

@@ -656,7 +656,7 @@ class Sequential(Model):
     def trainable(self, value):
         if self.built:
             self.model.trainable = value
-        super(Sequential, self).trainable = value
+        super(Sequential, self.__class__).trainable.fset(self, value)
 
     @property
     def trainable_weights(self):
