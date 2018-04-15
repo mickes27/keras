@@ -244,6 +244,9 @@ def test_batchnorm_trainable():
     model.compile(loss='mse', optimizer='rmsprop')
     out = model.predict(input_4)
     assert_allclose((input_4 - np.mean(input_4)) / np.std(input_4), out, atol=1e-3)
+    if K.backend() == 'cntk':
+        # Reset the learning phase for next tests
+        K.learning_phase().is_dynamic = True
 
     # In all other cases we should use the moving mean and variance from BN.
     for lp, trainable in [(1, False), (0, True), (0, False)]:
