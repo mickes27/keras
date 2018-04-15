@@ -243,7 +243,7 @@ def test_batchnorm_trainable():
     model.layers[1].trainable = True
     model.compile(loss='mse', optimizer='rmsprop')
     out = model.predict(input_4)
-    assert_allclose((input_4 - np.mean(input_4)) / np.std(input_4), out, atol=1e-4)
+    assert_allclose((input_4 - np.mean(input_4)) / np.std(input_4), out, atol=1e-3)
 
     # In all other cases we should use the moving mean and variance from BN.
     for lp, trainable in [(1, False), (0, True), (0, False)]:
@@ -252,7 +252,8 @@ def test_batchnorm_trainable():
         model.layers[1].trainable = trainable
         model.compile(loss='mse', optimizer='rmsprop')
         out = model.predict(input_4)
-        assert_allclose((input_4 - bn_mean) / bn_std, out, atol=1e-4)
+        assert_allclose((input_4 - bn_mean) / bn_std, out, atol=1e-3)
+
 
 
 if __name__ == '__main__':
