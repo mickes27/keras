@@ -259,6 +259,5 @@ def test_batchnorm_trainable():
         K.learning_phase().is_dynamic = True
 
 
-
 if __name__ == '__main__':
     pytest.main([__file__])
