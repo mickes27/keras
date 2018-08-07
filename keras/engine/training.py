@@ -25,6 +25,8 @@ from .. import optimizers
 from .. import losses
 from .. import metrics as metrics_module
 from ..utils.generic_utils import slice_arrays
+from ..utils.generic_utils import to_list
+from ..utils.generic_utils import unpack_singleton
 from ..legacy import interfaces
 
 
@@ -154,8 +156,7 @@ class Model(Network):
         masks = self.compute_mask(self.inputs, mask=None)
         if masks is None:
             masks = [None for _ in self.outputs]
-        if not isinstance(masks, list):
-            masks = [masks]
+        masks = to_list(masks)
 
         # Prepare loss weights.
         if loss_weights is None:
@@ -620,16 +621,10 @@ class Model(Network):
 
         if outputs is None:
             # Obtain symbolic outputs by calling the model.
-            if len(self.inputs) == 1:
-                if self._expects_training_arg:
-                    outputs = self.call(self.inputs[0], training=training)
-                else:
-                    outputs = self.call(self.inputs[0])
+            if self._expects_training_arg:
+                outputs = self.call(unpack_singleton(self.inputs), training=training)
             else:
-                if self._expects_training_arg:
-                    outputs = self.call(self.inputs, training=training)
-                else:
-                    outputs = self.call(self.inputs)
+                outputs = self.call(unpack_singleton(self.inputs))
         if isinstance(outputs, (list, tuple)):
             outputs = list(outputs)
         else:
@@ -767,7 +762,12 @@ class Model(Network):
                 for output_shape, loss_fn in zip(self._feed_output_shapes,
                                                  self._feed_loss_fns):
                     if loss_fn is losses.sparse_categorical_crossentropy:
-                        feed_output_shapes.append(output_shape[:-1] + (1,))
+                        if K.image_data_format() == 'channels_first' and len(
+                                output_shape) in [4, 5]:
+                            feed_output_shapes.append(
+                                (output_shape[0], 1) + output_shape[2:])
+                        else:
+                            feed_output_shapes.append(output_shape[:-1] + (1,))
                     elif (not hasattr(loss_fn, '__name__') or
                             getattr(losses, loss_fn.__name__, None) is None):
                         # If `loss_fn` is not a function (e.g. callable class)
@@ -974,9 +974,13 @@ class Model(Network):
                 val_ins = val_x + val_y + val_sample_weights
 
         elif validation_split and 0. < validation_split < 1.:
+            if any(K.is_tensor(t) for t in x):
+                raise ValueError(
+                    'If your data is in the form of symbolic tensors, '
+                    'you cannot use `validation_split`.')
             do_validation = True
             if hasattr(x[0], 'shape'):
-                split_at = int(x[0].shape[0] * (1. - validation_split))
+                split_at = int(int(x[0].shape[0]) * (1. - validation_split))
             else:
                 split_at = int(len(x[0]) * (1. - validation_split))
             x, val_x = (slice_arrays(x, 0, split_at),
@@ -1116,7 +1120,7 @@ class Model(Network):
 
         # Arguments
             x: The input data, as a Numpy array
-                (or list of Numpy arrays if the model has multiple outputs).
+                (or list of Numpy arrays if the model has multiple inputs).
             batch_size: Integer. If unspecified, it will default to 32.
             verbose: Verbosity mode, 0 or 1.
             steps: Total number of steps (batches of samples)
@@ -1209,9 +1213,7 @@ class Model(Network):
             ins = x + y + sample_weights
         self._make_train_function()
         outputs = self.train_function(ins)
-        if len(outputs) == 1:
-            return outputs[0]
-        return outputs
+        return unpack_singleton(outputs)
 
     def test_on_batch(self, x, y, sample_weight=None):
         """Test the model on a single batch of samples.
@@ -1250,9 +1252,7 @@ class Model(Network):
             ins = x + y + sample_weights
         self._make_test_function()
         outputs = self.test_function(ins)
-        if len(outputs) == 1:
-            return outputs[0]
-        return outputs
+        return unpack_singleton(outputs)
 
     def predict_on_batch(self, x):
         """Returns predictions for a single batch of samples.
@@ -1270,9 +1270,7 @@ class Model(Network):
             ins = x
         self._make_predict_function()
         outputs = self.predict_function(ins)
-        if len(outputs) == 1:
-            return outputs[0]
-        return outputs
+        return unpack_singleton(outputs)
 
     @interfaces.legacy_generator_methods_support
     def fit_generator(self, generator,
@@ -1336,7 +1334,7 @@ class Model(Network):
                 List of callbacks to apply during training.
                 See [callbacks](/callbacks).
             validation_data: This can be either
-                - a generator for the validation data
+                - a generator or a `Sequence` object for the validation data
                 - tuple `(x_val, y_val)`
                 - tuple `(x_val, y_val, val_sample_weights)`
                 on which to evaluate

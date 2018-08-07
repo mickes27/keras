@@ -7,7 +7,7 @@ import scipy.sparse as sparse
 
 import keras
 from keras import losses
-from keras.layers import Dense, Dropout
+from keras.layers import Activation, Dense, Dropout, Conv2D, Concatenate
 from keras.engine import Input
 from keras.engine.training import Model
 from keras.engine import training_utils
@@ -1232,6 +1232,252 @@ def test_pandas_dataframe():
                           output_a_df)
     model_2.test_on_batch({'input_a': input_a_df, 'input_b': input_b_df},
                           [output_a_df, output_b_df])
+
+
+@keras_test
+@pytest.mark.skipif(K.backend() != 'tensorflow', reason='Requires TensorFlow')
+@pytest.mark.skipif((K.backend() == 'tensorflow' and
+                     not hasattr(K.get_session(),
+                                 '_make_callable_from_options')),
+                    reason='Requires TF 1.8 or higher')
+def test_training_and_eval_methods_on_symbolic_tensors_single_io():
+    x = keras.layers.Input(shape=(3,), name='input')
+    y = keras.layers.Dense(4, name='dense')(x)
+    model = keras.Model(x, y)
+
+    optimizer = 'rmsprop'
+    loss = 'mse'
+    metrics = ['mae']
+    model.compile(optimizer, loss, metrics=metrics)
+
+    inputs = keras.backend.zeros(shape=(10, 3))
+    targets = keras.backend.zeros(shape=(10, 4))
+
+    model.fit(inputs, targets, epochs=1, steps_per_epoch=2, verbose=0)
+    model.evaluate(inputs, targets, steps=2, verbose=0)
+    model.predict(inputs, steps=2)
+    model.train_on_batch(inputs, targets)
+    model.test_on_batch(inputs, targets)
+    model.fit(inputs, targets,
+              epochs=1, steps_per_epoch=2, verbose=1,
+              validation_data=(inputs, targets), validation_steps=2)
+
+
+@keras_test
+@pytest.mark.skipif(K.backend() != 'tensorflow', reason='Requires TensorFlow')
+@pytest.mark.skipif((K.backend() == 'tensorflow' and
+                     not hasattr(K.get_session(),
+                                 '_make_callable_from_options')),
+                    reason='Requires TF 1.8 or higher')
+def test_training_and_eval_methods_on_symbolic_tensors_multi_io():
+    a = keras.layers.Input(shape=(3,), name='input_a')
+    b = keras.layers.Input(shape=(3,), name='input_b')
+
+    dense = keras.layers.Dense(4, name='dense')
+    c = dense(a)
+    d = dense(b)
+    e = keras.layers.Dropout(0.5, name='dropout')(c)
+
+    model = keras.models.Model([a, b], [d, e])
+
+    optimizer = 'rmsprop'
+    loss = 'mse'
+    loss_weights = [1., 0.5]
+    metrics = ['mae']
+    model.compile(optimizer, loss, metrics=metrics, loss_weights=loss_weights)
+
+    input_a_tf = keras.backend.zeros(shape=(10, 3))
+    input_b_tf = keras.backend.zeros(shape=(10, 3))
+
+    output_d_tf = keras.backend.zeros(shape=(10, 4))
+    output_e_tf = keras.backend.zeros(shape=(10, 4))
+
+    model.fit(
+        [input_a_tf, input_b_tf], [output_d_tf, output_e_tf],
+        epochs=1,
+        steps_per_epoch=2,
+        verbose=0)
+    with pytest.raises(ValueError) as excinfo:
+        model.fit(
+            [input_a_tf, input_b_tf], [output_d_tf, output_e_tf],
+            epochs=1,
+            batch_size=5,
+            verbose=0)
+    assert 'should specify the `steps_per_epoch`' in str(excinfo.value)
+    model.train_on_batch([input_a_tf, input_b_tf], [output_d_tf, output_e_tf])
+
+    # Test with dictionary inputs
+    model.fit(
+        {'input_a': input_a_tf,
+         'input_b': input_b_tf},
+        {'dense': output_d_tf,
+         'dropout': output_e_tf},
+        epochs=1,
+        steps_per_epoch=2,
+        verbose=0)
+    model.fit(
+        {'input_a': input_a_tf,
+         'input_b': input_b_tf},
+        {'dense': output_d_tf,
+         'dropout': output_e_tf},
+        validation_data=({'input_a': input_a_tf,
+                          'input_b': input_b_tf},
+                         {'dense': output_d_tf,
+                          'dropout': output_e_tf}),
+        epochs=1,
+        steps_per_epoch=2,
+        validation_steps=2,
+        verbose=0)
+    model.train_on_batch(
+        {'input_a': input_a_tf,
+         'input_b': input_b_tf},
+        {'dense': output_d_tf,
+         'dropout': output_e_tf})
+
+    # Test with validation data
+    model.fit(
+        [input_a_tf, input_b_tf], [output_d_tf, output_e_tf],
+        validation_data=([input_a_tf, input_b_tf],
+                         [output_d_tf, output_e_tf]),
+        epochs=1,
+        steps_per_epoch=2,
+        validation_steps=2,
+        verbose=0)
+    # Test with validation split
+    with pytest.raises(ValueError) as excinfo:
+        model.fit(
+            [input_a_tf, input_b_tf], [output_d_tf, output_e_tf],
+            epochs=2,
+            steps_per_epoch=2,
+            verbose=0,
+            validation_split=0.2,
+            validation_steps=2)
+    assert 'you cannot use `validation_split`' in str(excinfo.value)
+
+    # Test evaluation / prediction methods
+    model.evaluate([input_a_tf, input_b_tf], [output_d_tf, output_e_tf],
+                   steps=2, verbose=0)
+    model.predict([input_a_tf, input_b_tf], steps=2)
+    model.test_on_batch([input_a_tf, input_b_tf], [output_d_tf, output_e_tf])
+
+
+@keras_test
+def test_model_with_crossentropy_losses_channels_first():
+    """Tests use of all crossentropy losses with `channels_first`.
+
+    Tests `sparse_categorical_crossentropy`, `categorical_crossentropy`,
+    and `binary_crossentropy`.
+    Verifies that evaluate gives the same result with either
+    `channels_first` or `channels_last` image_data_format.
+    Tests PR #9715.
+    """
+    def prepare_simple_model(input_tensor, loss_name, target):
+        axis = 1 if K.image_data_format() == 'channels_first' else -1
+        if loss_name == 'sparse_categorical_crossentropy':
+            loss = lambda y_true, y_pred: K.sparse_categorical_crossentropy(
+                y_true, y_pred, axis=axis)
+            num_channels = np.amax(target) + 1
+            activation = 'softmax'
+        elif loss_name == 'categorical_crossentropy':
+            loss = lambda y_true, y_pred: K.categorical_crossentropy(
+                y_true, y_pred, axis=axis)
+            num_channels = target.shape[axis]
+            activation = 'softmax'
+        elif loss_name == 'binary_crossentropy':
+            loss = lambda y_true, y_pred: K.binary_crossentropy(y_true, y_pred)
+            num_channels = target.shape[axis]
+            activation = 'sigmoid'
+        predictions = Conv2D(num_channels, 1, activation=activation,
+                             kernel_initializer='ones',
+                             bias_initializer='ones')(input_tensor)
+        simple_model = Model(inputs=input_tensor, outputs=predictions)
+        simple_model.compile(optimizer='rmsprop', loss=loss)
+        return simple_model
+
+    losses_to_test = ['sparse_categorical_crossentropy',
+                      'categorical_crossentropy', 'binary_crossentropy']
+
+    data_channels_first = np.array([[[[8., 7.1, 0.], [4.5, 2.6, 0.55],
+                                      [0.9, 4.2, 11.2]]]], dtype=np.float32)
+    # Labels for testing 4-class sparse_categorical_crossentropy, 4-class
+    # categorical_crossentropy, and 2-class binary_crossentropy:
+    labels_channels_first = [np.array([[[[0, 1, 3], [2, 1, 0], [2, 2, 1]]]]),
+                             np.array([[[[0, 1, 0], [0, 1, 0], [0, 0, 0]],
+                                        [[1, 0, 0], [0, 0, 1], [0, 1, 0]],
+                                        [[0, 0, 0], [1, 0, 0], [0, 0, 1]],
+                                        [[0, 0, 1], [0, 0, 0], [1, 0, 0]]]]),
+                             np.array([[[[0, 1, 0], [0, 1, 0], [0, 0, 1]],
+                                        [[1, 0, 1], [1, 0, 1], [1, 1, 0]]]])]
+    # Compute one loss for each loss function in the list `losses_to_test`:
+    loss_channels_last = [0., 0., 0.]
+    loss_channels_first = [0., 0., 0.]
+
+    old_data_format = K.image_data_format()
+
+    # Evaluate a simple network with channels last, with all three loss
+    # functions:
+    K.set_image_data_format('channels_last')
+    data = np.moveaxis(data_channels_first, 1, -1)
+    for index, loss_function in enumerate(losses_to_test):
+        labels = np.moveaxis(labels_channels_first[index], 1, -1)
+        inputs = Input(shape=(3, 3, 1))
+        model = prepare_simple_model(inputs, loss_function, labels)
+        loss_channels_last[index] = model.evaluate(x=data, y=labels,
+                                                   batch_size=1, verbose=0)
+
+    # Evaluate the same network with channels first, with all three loss
+    # functions:
+    K.set_image_data_format('channels_first')
+    data = data_channels_first
+    for index, loss_function in enumerate(losses_to_test):
+        labels = labels_channels_first[index]
+        inputs = Input(shape=(1, 3, 3))
+        model = prepare_simple_model(inputs, loss_function, labels)
+        loss_channels_first[index] = model.evaluate(x=data, y=labels,
+                                                    batch_size=1, verbose=0)
+
+    K.set_image_data_format(old_data_format)
+
+    assert_allclose(loss_channels_first, loss_channels_last,
+                    err_msg='{}{}'.format('Computed different losses for ',
+                                          'channels_first and channels_last.'))
+
+
+@keras_test
+def test_dynamic_set_inputs():
+    model = Sequential()
+    model.add(Dense(16, input_dim=32))
+    model.add(Activation('relu'))
+
+    model2 = Sequential()
+    model2.add(model.layers[-1])
+    model2.add(Dense(8))
+    preds2 = model2.predict([np.random.random((1, 32))])
+    assert preds2.shape == (1, 8)
+
+    model3 = Model(inputs=model.inputs, outputs=model.outputs)
+    with pytest.raises(ValueError):
+        model3._set_inputs(model.inputs)
+
+    model3.inputs = None
+    model3._set_inputs(model.inputs)
+    preds3 = model3.predict([np.random.random((1, 32))])
+    assert preds3.shape == (1, 16)
+
+    model3.inputs = None
+    model3._set_inputs(model.input)
+    preds3 = model3.predict(np.random.random((1, 32)))
+    assert preds3.shape == (1, 16)
+
+    aux_input = Input(shape=(5,), name='aux_input')
+    aux_model = Dense(3)(aux_input)
+    model4 = Model(inputs=model.inputs + [aux_input],
+                   outputs=Concatenate()(model.outputs + [aux_model]))
+    model4.inputs = None
+    model4._set_inputs(model.inputs + [aux_input])
+    preds4 = model4.predict([np.random.random((1, 32)),
+                             np.random.random((1, 5))])
+    assert preds4.shape == (1, 19)
 
 
 if __name__ == '__main__':

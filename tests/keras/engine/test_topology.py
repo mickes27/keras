@@ -9,6 +9,12 @@ from keras.models import Model, Sequential
 from keras import backend as K
 from keras.models import model_from_json, model_from_yaml
 from keras.utils.test_utils import keras_test
+from keras.initializers import Constant
+
+
+skipif_no_tf_gpu = pytest.mark.skipif(
+    (K.backend() != 'tensorflow') or (not K.tensorflow_backend._get_available_gpus()),
+    reason='Requires TensorFlow backend and a GPU')
 
 
 @keras_test
@@ -630,8 +636,7 @@ def test_preprocess_weights_for_loading_rnn_should_be_idempotent(layer_class, la
     (layers.CuDNNGRU, {'units': 2, 'input_shape': [3, 5]}),
     (layers.CuDNNLSTM, {'units': 2, 'input_shape': [3, 5]}),
 ])
-@pytest.mark.skipif((K.backend() != 'tensorflow'), reason='Requires TensorFlow backend')
-@pytest.mark.skipif(not K.tensorflow_backend._get_available_gpus(), reason='Requires GPU')
+@skipif_no_tf_gpu
 def test_preprocess_weights_for_loading_cudnn_rnn_should_be_idempotent(layer_class, layer_args):
     test_preprocess_weights_for_loading_rnn_should_be_idempotent(layer_class, layer_args)
 
@@ -791,6 +796,20 @@ def test_multi_output_mask():
     z = ArbitraryMultiInputLayer()([x, y])
     _ = Model(inputs=input_layer, outputs=z)
     assert K.int_shape(z)[1:] == (16, 16, 3)
+
+
+@keras_test
+def test_constant_initializer_with_numpy():
+    model = Sequential()
+    model.add(Dense(2, input_shape=(3,), kernel_initializer=Constant(np.ones((3, 2)))))
+    model.add(Dense(3))
+    model.compile(loss='mse', optimizer='sgd', metrics=['acc'])
+
+    json_str = model.to_json()
+    model_from_json(json_str).summary()
+
+    yaml_str = model.to_yaml()
+    model_from_yaml(yaml_str).summary()
 
 
 if __name__ == '__main__':

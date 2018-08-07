@@ -176,6 +176,7 @@ class BatchNormalization(Layer):
                     broadcast_moving_variance,
                     broadcast_beta,
                     broadcast_gamma,
+                    axis=self.axis,
                     epsilon=self.epsilon)
             else:
                 return K.batch_normalization(
@@ -184,6 +185,7 @@ class BatchNormalization(Layer):
                     self.moving_variance,
                     self.beta,
                     self.gamma,
+                    axis=self.axis,
                     epsilon=self.epsilon)
 
         if training in {0, False}:
