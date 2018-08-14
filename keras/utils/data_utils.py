@@ -646,29 +646,32 @@ class GeneratorEnqueuer(SequenceEnqueuer):
     def _data_generator_task(self):
         if self._use_multiprocessing is False:
             while not self._stop_event.is_set():
-                with self.genlock:
-                    try:
-                        if (self.queue is not None and
-                                self.queue.qsize() < self.max_queue_size):
-                            # On all OSes, avoid **SYSTEMATIC** error
-                            # in multithreading mode:
-                            # `ValueError: generator already executing`
-                            # => Serialize calls to
-                            # infinite iterator/generator's next() function
-                            generator_output = next(self._generator)
-                            self.queue.put((True, generator_output))
+                try:
+                    if (self.queue is not None and
+                            self.queue.qsize() < self.max_queue_size):
+                        if os.name is 'nt':
+                            with self.genlock:
+                                # On Windows, avoid **SYSTEMATIC** error
+                                # in multithreading mode:
+                                # `ValueError: generator already executing`
+                                # => Serialize calls to
+                                # infinite iterator/generator's next() function
+                                generator_output = next(self._generator)
                         else:
-                            time.sleep(self.wait_time)
-                    except StopIteration:
-                        break
-                    except Exception as e:
-                        # Can't pickle tracebacks.
-                        # As a compromise, print the traceback and pickle None instead.
-                        if not hasattr(e, '__traceback__'):
-                            setattr(e, '__traceback__', sys.exc_info()[2])
-                        self.queue.put((False, e))
-                        self._stop_event.set()
-                        break
+                            generator_output = next(self._generator)
+                        self.queue.put((True, generator_output))
+                    else:
+                        time.sleep(self.wait_time)
+                except StopIteration:
+                    break
+                except Exception as e:
+                    # Can't pickle tracebacks.
+                    # As a compromise, print the traceback and pickle None instead.
+                    if not hasattr(e, '__traceback__'):
+                        setattr(e, '__traceback__', sys.exc_info()[2])
+                    self.queue.put((False, e))
+                    self._stop_event.set()
+                    break
         else:
             while not self._stop_event.is_set():
                 try:
